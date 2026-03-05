@@ -4,48 +4,225 @@ This file provides context, conventions, and workflows for AI assistants (Claude
 
 ## Project Overview
 
-**Texas Carp Network** is a web application for Texas carp fishermen. It is currently in the initial setup phase with no application code yet written. This file documents the intended conventions and workflows to follow as the project is built out.
-
-- **Repository:** Atticusth7/Texas-Carp-Network
-- **Current State:** Initial commit only — README.md is the sole tracked file
-- **Goal:** A community/utility web app serving Texas carp fishing enthusiasts
-
----
-
-## Repository Structure (Intended)
-
-As the project grows, follow this structure:
-
-```
-Texas-Carp-Network/
-├── CLAUDE.md              # This file
-├── README.md              # Project overview and setup instructions
-├── .gitignore             # Git ignore rules
-├── package.json           # Project dependencies and scripts
-├── .env.example           # Example environment variables (never commit .env)
-├── src/                   # Application source code
-│   ├── client/            # Frontend application
-│   └── server/            # Backend API
-├── public/                # Static assets
-├── tests/                 # Test files mirroring src/ structure
-├── docs/                  # Additional documentation
-└── scripts/               # Utility scripts
-```
+**Texas Carp Network** is a community web app for Texas carp fishermen to:
+- Log and share **catches** (species, weight, length, location, photos)
+- Record **gear used** (rod, reel, line, hook, bait, rig) per catch
+- Log **water conditions** (temp, clarity, depth, current, weather) per catch
+- Write and share community **posts** (tips, stories, questions)
+- View other anglers' profiles with their catch and post history
 
 ---
 
 ## Tech Stack
 
-No stack has been chosen yet. When beginning development, decisions should be documented here. Common patterns for a project like this:
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS |
+| Auth | Clerk (`@clerk/nextjs` v6) |
+| ORM | Prisma v5 |
+| Database | PostgreSQL (Neon, Supabase, or Railway recommended) |
+| Image Storage | Cloudinary |
+| Deployment | Vercel |
 
-- **Frontend:** React or Next.js with TypeScript
-- **Backend:** Node.js/Express or Next.js API routes
-- **Database:** PostgreSQL or SQLite (via Prisma or Drizzle ORM)
-- **Styling:** Tailwind CSS
-- **Auth:** NextAuth.js or Clerk
-- **Testing:** Vitest + React Testing Library
+---
 
-**When a stack is chosen, update this section with the actual choices.**
+## Directory Structure
+
+```
+Texas-Carp-Network/
+├── CLAUDE.md
+├── README.md
+├── .env.example                # Required env vars (copy to .env for local dev)
+├── .gitignore
+├── package.json
+├── tsconfig.json
+├── next.config.ts
+├── tailwind.config.ts
+├── postcss.config.mjs
+├── middleware.ts               # Clerk auth middleware (protects routes)
+├── prisma/
+│   └── schema.prisma           # Database schema (User, Catch, Gear, WaterConditions, Post)
+└── src/
+    ├── app/
+    │   ├── layout.tsx           # Root layout with ClerkProvider + Navbar + Footer
+    │   ├── globals.css          # Tailwind base + reusable CSS classes
+    │   ├── page.tsx             # Home / feed page
+    │   ├── (auth)/              # Clerk auth pages (sign-in, sign-up)
+    │   ├── catches/
+    │   │   ├── page.tsx         # All catches list
+    │   │   ├── new/page.tsx     # Log a new catch (protected)
+    │   │   └── [id]/page.tsx    # Single catch detail
+    │   ├── posts/
+    │   │   ├── page.tsx         # All posts list
+    │   │   ├── new/page.tsx     # Create a new post (protected)
+    │   │   └── [id]/page.tsx    # Single post detail
+    │   ├── profile/
+    │   │   └── [username]/page.tsx  # User profile page
+    │   └── api/
+    │       ├── catches/
+    │       │   ├── route.ts         # GET all, POST create
+    │       │   └── [id]/route.ts    # GET one, DELETE
+    │       ├── posts/
+    │       │   ├── route.ts         # GET all, POST create
+    │       │   └── [id]/route.ts    # GET one, DELETE
+    │       ├── upload/route.ts      # POST image → Cloudinary
+    │       └── webhooks/clerk/route.ts  # Clerk user sync webhook
+    ├── components/
+    │   ├── layout/
+    │   │   ├── Navbar.tsx
+    │   │   └── Footer.tsx
+    │   ├── catches/
+    │   │   ├── CatchCard.tsx    # Card shown in lists
+    │   │   └── CatchForm.tsx    # Full catch submission form (client component)
+    │   ├── posts/
+    │   │   ├── PostCard.tsx
+    │   │   └── PostForm.tsx
+    │   └── shared/
+    │       └── ImageUpload.tsx  # Drag-and-drop photo upload to Cloudinary
+    ├── lib/
+    │   ├── prisma.ts            # Prisma client singleton
+    │   ├── cloudinary.ts        # Cloudinary upload helper
+    │   └── utils.ts             # Formatters + constants (species, gear types, etc.)
+    └── types/
+        └── index.ts             # Shared TypeScript types (CatchWithRelations, etc.)
+```
+
+---
+
+## Database Schema
+
+### Models
+
+| Model | Key Fields |
+|---|---|
+| `User` | `id` (Clerk ID), `username`, `email`, `name`, `bio`, `avatarUrl` |
+| `Catch` | `userId`, `title`, `species`, `weightLbs`, `lengthIn`, `location`, `photos[]`, `caughtAt` |
+| `Gear` | `catchId`, `type`, `brand`, `model`, `description` |
+| `WaterConditions` | `catchId`, `tempF`, `clarity`, `depthFt`, `currentSpeed`, `weather`, `airTempF`, `windMph`, `notes` |
+| `Post` | `userId`, `title`, `content`, `photos[]` |
+
+### Relations
+- `User` → many `Catch`, many `Post`
+- `Catch` → many `Gear`, one `WaterConditions`
+
+---
+
+## Local Development Setup
+
+### 1. Clone and install
+
+```bash
+npm install
+```
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+# Fill in all values in .env
+```
+
+Required services (all have free tiers):
+- **Clerk** → https://clerk.com — create project, copy publishable + secret key
+- **PostgreSQL** → Neon (https://neon.tech) or Supabase (https://supabase.com) — copy `DATABASE_URL`
+- **Cloudinary** → https://cloudinary.com — copy cloud name, API key, secret
+
+### 3. Push database schema
+
+```bash
+npm run db:push       # Push schema to DB (dev, no migration history)
+# or
+npm run db:migrate    # Create and run migrations (preferred for production)
+```
+
+### 4. Set up Clerk webhook
+
+In the Clerk dashboard, create a webhook pointing to:
+```
+https://your-domain.com/api/webhooks/clerk
+```
+Subscribe to events: `user.created`, `user.updated`, `user.deleted`
+
+Copy the webhook signing secret to `CLERK_WEBHOOK_SECRET` in `.env`.
+
+### 5. Run dev server
+
+```bash
+npm run dev
+```
+
+---
+
+## Available Scripts
+
+```bash
+npm run dev          # Start development server
+npm run build        # Generate Prisma client + build for production
+npm run start        # Start production server
+npm run lint         # Run ESLint
+npm run db:push      # Push schema to database (no migration files)
+npm run db:migrate   # Run migrations (generates migration files)
+npm run db:studio    # Open Prisma Studio (visual DB browser)
+npm run db:generate  # Regenerate Prisma client after schema changes
+npm run db:reset     # Reset database and re-run all migrations
+```
+
+---
+
+## Deployment (Vercel)
+
+### One-time setup
+
+1. Push to GitHub
+2. Import repo in Vercel dashboard
+3. Add all environment variables from `.env` in Vercel project settings
+4. Deploy — Vercel auto-detects Next.js
+
+### Build command
+
+The `build` script in `package.json` runs `prisma generate && next build`, so Vercel will generate the Prisma client automatically.
+
+### Database
+
+Use Neon (https://neon.tech) for free managed Postgres that works natively with Vercel. Add the connection string as `DATABASE_URL`.
+
+---
+
+## Auth Flow (Clerk)
+
+- Protected routes: `/catches/new`, `/posts/new`, `/profile/*`
+- Protection enforced in `middleware.ts` using `clerkMiddleware` + `createRouteMatcher`
+- Users are synced to the local `User` table via Clerk webhooks (`/api/webhooks/clerk`)
+- **Must set up the webhook** before users can post — the API checks for a local user record
+
+---
+
+## Image Upload Flow
+
+1. Client selects file via `ImageUpload` component
+2. File is `POST`ed to `/api/upload` as `multipart/form-data`
+3. Server validates file type (JPEG/PNG/WebP/GIF) and size (≤10MB)
+4. Server uploads to Cloudinary via `cloudinary.uploader.upload_stream`
+5. Cloudinary URL is returned and stored in the `photos` array of a catch or post
+
+---
+
+## CSS Conventions
+
+Reusable classes are defined in `globals.css` using `@layer components`:
+
+| Class | Usage |
+|---|---|
+| `.btn-primary` | Green primary action button |
+| `.btn-secondary` | Outlined secondary button |
+| `.btn-danger` | Red destructive action button |
+| `.card` | White rounded card with border + shadow |
+| `.input` | Styled form input / select / textarea |
+| `.label` | Form field label |
+| `.badge`, `.badge-green`, `.badge-blue`, `.badge-gray` | Small inline labels |
+| `.section-title` | Large section heading |
 
 ---
 
@@ -55,143 +232,27 @@ No stack has been chosen yet. When beginning development, decisions should be do
 
 - `main` / `master` — stable production code
 - `claude/<feature-slug>` — AI-assisted development branches
-- `feature/<feature-slug>` — human-led feature branches
-- `fix/<issue-slug>` — bug fixes
-- `chore/<task-slug>` — maintenance tasks
+- `feature/<feature-slug>` — human-led features
+- `fix/<slug>` — bug fixes
 
 ### Commit Conventions
 
-Use imperative, present-tense commit messages:
-
+Use imperative present-tense messages:
 ```
-Add user authentication module
-Fix map rendering bug on mobile
-Update fishing spot API endpoint
+Add gear detail section to catch form
+Fix water conditions not saving on create
+Update Navbar with mobile catch button
 ```
-
-- Keep the subject line under 72 characters
-- Reference issue numbers when applicable: `Fix map zoom (#42)`
-
-### Push Rules
-
-- Never push directly to `master` or `main` without review
-- Always push AI-developed code to a `claude/` branch
-- Use `git push -u origin <branch-name>` when pushing a new branch
-
----
-
-## Development Workflows
-
-### Starting Fresh (Project Bootstrap)
-
-When setting up the application for the first time:
-
-1. Initialize the package manager and framework
-2. Create `.gitignore` (use gitignore.io for the chosen stack)
-3. Add `.env.example` with all required variables documented
-4. Configure linting and formatting (ESLint + Prettier)
-5. Set up a basic test runner
-6. Update README.md with setup and run instructions
-
-### Adding a New Feature
-
-1. Create a branch: `git checkout -b feature/<name>`
-2. Write tests first when practical
-3. Implement the feature
-4. Run linting and tests before committing
-5. Write a clear commit message
-6. Push and open a PR
-
-### Running the Project
-
-No scripts exist yet. Once package.json is added, document commands here:
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Run tests
-npm test
-
-# Build for production
-npm run build
-```
-
----
-
-## Code Conventions
-
-### General
-
-- Use **TypeScript** if a typed language is chosen — prefer explicit types over `any`
-- Prefer **named exports** over default exports for better refactoring support
-- Keep files small and focused — one primary concern per file
-- Use descriptive variable and function names; avoid abbreviations
-
-### File Naming
-
-- React components: `PascalCase.tsx` (e.g., `FishingSpotCard.tsx`)
-- Utilities/hooks: `camelCase.ts` (e.g., `useFishingSpots.ts`)
-- Test files: co-located or in `tests/`, named `<file>.test.ts`
-- Constants: `SCREAMING_SNAKE_CASE` for true constants
-
-### Environment Variables
-
-- Never commit `.env` files
-- Always maintain `.env.example` with placeholder values and comments
-- Prefix client-side env vars per framework convention (e.g., `NEXT_PUBLIC_`, `VITE_`)
-
-### Error Handling
-
-- Always handle async errors — use try/catch or `.catch()` consistently
-- Return meaningful error messages from API endpoints
-- Log errors server-side; show user-friendly messages client-side
-
----
-
-## Testing
-
-No testing framework is configured yet. When added:
-
-- **Unit tests** for utility functions and hooks
-- **Integration tests** for API endpoints
-- **Component tests** for UI with React Testing Library
-- Aim for meaningful coverage of critical paths, not arbitrary percentage targets
-
----
-
-## Security Practices
-
-- Never hardcode credentials, API keys, or secrets in source files
-- Validate and sanitize all user input on the server side
-- Use parameterized queries — never string-interpolate SQL
-- Keep dependencies updated; address known vulnerabilities promptly
 
 ---
 
 ## AI Assistant Guidelines
 
-When Claude Code or another AI assistant works in this repo:
-
-1. **Read before editing** — always read existing files before modifying them
-2. **Minimal changes** — make only the changes necessary to fulfill the request; do not refactor unrelated code
-3. **No speculation** — do not add features, configs, or abstractions not explicitly requested
-4. **Document decisions** — if a significant architectural choice is made, update this file or README.md
-5. **Use the designated branch** — all AI-assisted work goes on a `claude/` branch; never push to `master` directly
-6. **Test before committing** — run linting and tests (once configured) before finalizing commits
-7. **Update CLAUDE.md** — as the project grows and conventions are established, keep this file current
-
----
-
-## Notes for Future Contributors
-
-This project is in its earliest stage. The conventions above are intentional starting points. As real implementation decisions are made, update this file to reflect:
-
-- Actual tech stack choices
-- Real script names from package.json
-- Database schema overview
-- Authentication approach
-- Deployment targets and CI/CD setup
+1. **Read before editing** — always read existing files before modifying
+2. **Minimal changes** — only change what's requested; don't refactor unrelated code
+3. **No speculation** — don't add features, configs, or abstractions not explicitly asked for
+4. **Maintain types** — update `src/types/index.ts` when Prisma schema changes
+5. **Use designated branch** — all AI work goes on a `claude/` branch
+6. **Run lint before committing** — `npm run lint`
+7. **Update this file** — when conventions or stack decisions change, update CLAUDE.md
+8. **After Prisma schema changes** — always run `npm run db:generate` and update types
