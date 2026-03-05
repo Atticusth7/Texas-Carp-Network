@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id // Clerk user ID
+  username  String   @unique
+  email     String   @unique
+  name      String?
+  bio       String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  catches Catch[]
+  posts   Post[]
+
+  @@map("users")
+}
+
+model Catch {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  species     String
+  weightLbs   Float?
+  lengthIn    Float?
+  location    String?
+  photos      String[] // Cloudinary URLs
+  caughtAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  gear            Gear[]
+  waterConditions WaterConditions?
+
+  @@map("catches")
+}
+
+model WaterConditions {
+  id           String  @id @default(cuid())
+  catchId      String  @unique
+  catch        Catch   @relation(fields: [catchId], references: [id], onDelete: Cascade)
+  tempF        Float?  // water temperature in Fahrenheit
+  clarity      String? // clear | slightly_stained | stained | murky
+  depthFt      Float?  // depth in feet
+  currentSpeed String? // still | slow | moderate | fast
+  weather      String? // sunny | partly_cloudy | overcast | rainy | windy
+  airTempF     Float?  // air temperature in Fahrenheit
+  windMph      Float?  // wind speed in mph
+  notes        String?
+
+  @@map("water_conditions")
+}
+
+model Gear {
+  id          String  @id @default(cuid())
+  catchId     String
+  catch       Catch   @relation(fields: [catchId], references: [id], onDelete: Cascade)
+  type        String  // rod | reel | line | hook | bait | rig | other
+  brand       String?
+  model       String?
+  description String?
+
+  @@map("gear")
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  content   String
+  photos    String[] // Cloudinary URLs
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("posts")
+}
